@@ -1,9 +1,51 @@
 const express = require('express');
+const auth = require('../../middleware/auth');
 const router = express.Router();
+const { body, validationResult } = require('express-validator');
+const Post = require('../../models/Post');
+const User = require('../../models/User');
+const Profile = require('../../models/Profile');
 
+// @rout     Post api/posts
+// @desc     Create Post
+// @access   Private
+router.post(
+  '/',
+  [auth, [body('text', 'Text is required.').not().isEmpty()]],
+  async (req, res) => {
+    const error = validationResult(req);
+    if (!error.isEmpty()) {
+      return res.status(400).json({ error: error.array() });
+    }
+    try {
+      const user = await User.findById(req.user.id).select('-password');
+
+      const newPost = new Post({
+        text: req.body.text,
+        name: user.name,
+        avatar: user.avatar,
+        user: req.user.id,
+      });
+      const post = await newPost.save();
+
+      res.json(post);
+    } catch (err) {
+      console.error(err.message);
+      res.status(500).send('Server Error');
+    }
+  }
+);
 // @rout     Get api/posts
-// @desc     Test rout
-// @access   Public
-router.get('/', (req, res) => res.send('Posts rout'));
+// @desc     Get all posts
+// @access   Private
+router.get('/', auth, async (req, res) => {
+  try {
+    const posts = await Post.find().sort({ date: -1 });
+    res.json(posts);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
 
 module.exports = router;
